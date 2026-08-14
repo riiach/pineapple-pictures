@@ -68,6 +68,28 @@ It's possible to build it under Windows, Linux, macOS, and maybe other desktop p
 > [!NOTE]
 > Although there is a `pineapple-pictures.pro` file which can be used for QMake build, it's only for testing purpose and it doesn't have `exiv2` support included. Using QMake to build this project is NOT supported, please use CMake if possible.
 
+## Fork Modifications
+
+This fork adds three small changes on top of upstream `pineapple-pictures`, aimed at using the app more like a desktop sticky note for reference images.
+
+### 1. Stay-on-top is off by default
+
+Upstream keeps every window pinned above all other windows by default (`Stay on top`). This fork flips that default to `off`, so windows follow the normal focus order instead: click another app and the picture window quietly moves behind it, just like any other window. The `Stay on top` toggle in the right-click menu still works exactly as before if you want the old always-on-top behavior back.
+
+### 2. "+" button to pin multiple pictures at once
+
+A `+` button was added to the title bar, next to the close button. Clicking it opens a file picker where you can select one or more images; each selected image opens in its own independent window, so you can have several pictures pinned on your desktop at the same time instead of just one.
+
+### 3. Lock button
+
+A Lock button was added next to the `+` and close buttons. When enabled:
+
+- Hovering over the window no longer reveals the title bar background, window title, `+` button, bottom toolbar, or the prev/next navigation arrows.
+- Only the Lock and Close buttons remain visible on hover, so the picture stays out of the way while you work.
+- Click the Lock button again to unlock and restore the full UI.
+
+This is meant for cases where you just want a picture pinned quietly on screen without accidentally triggering zoom, rotate, or other controls while moving your mouse over it.
+
 ## License
 
 Pineapple Pictures as a whole is licensed under MIT license. Individual files may have a different, but compatible license.
