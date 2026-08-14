@@ -11,5 +11,6 @@
         <file>icons/go-next.svg</file>
         <file>icons/go-previous.svg</file>
         <file>plain/translators.html</file>
+        <file>icons/list-add.svg</file>
     </qresource>
 </RCC>

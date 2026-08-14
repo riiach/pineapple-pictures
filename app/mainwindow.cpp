@@ -113,6 +113,8 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::closeWindow);
     connect(m_titleBar, &TitleBar::maximizeToggleRequested,
             this, &MainWindow::toggleMaximize);
+    connect(m_titleBar, &TitleBar::addRequested,
+            this, &MainWindow::openImagesInNewWindows);
 
     m_prevButton = new ToolButton(m_graphicsView);
     m_prevButton->setIconSize(QSize(75, 75));
@@ -653,6 +655,25 @@ void MainWindow::toggleStayOnTop()
 {
     setWindowFlag(Qt::WindowStaysOnTopHint, !stayOnTop());
     show();
+}
+
+void MainWindow::openImagesInNewWindows()
+{
+    // Lets the user pin more than one picture at the same time: every file
+    // picked here gets its own independent, top-level MainWindow instead of
+    // replacing what is currently shown in this window.
+    QStringList picturesLocations = QStandardPaths::standardLocations(QStandardPaths::PicturesLocation);
+    QUrl pictureUrl = picturesLocations.isEmpty() ? QUrl::fromLocalFile(QDir::homePath())
+                                                   : QUrl::fromLocalFile(picturesLocations.first());
+    const QList<QUrl> urls = QFileDialog::getOpenFileUrls(this, tr("Open Image(s)"), pictureUrl);
+
+    for (const QUrl &url : urls) {
+        MainWindow *newWindow = new MainWindow();
+        newWindow->setAttribute(Qt::WA_DeleteOnClose);
+        newWindow->showUrls({url});
+        newWindow->initWindowSize();
+        newWindow->show();
+    }
 }
 
 void MainWindow::toggleAvoidResetTransform()

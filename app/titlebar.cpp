@@ -18,6 +18,7 @@ TitleBar::TitleBar(QWidget *parent)
     : QWidget(parent)
     , m_opacityHelper(new OpacityHelper(this))
     , m_closeIcon(QStringLiteral(":/icons/window-close.svg"))
+    , m_addIcon(QStringLiteral(":/icons/list-add.svg"))
 {
     setFixedHeight(32);
     setMouseTracking(true);
@@ -52,11 +53,34 @@ void TitleBar::setCloseButtonOnly(bool only)
     update();
 }
 
+void TitleBar::setAddButtonVisible(bool visible)
+{
+    if (m_addButtonVisible == visible)
+        return;
+    m_addButtonVisible = visible;
+    if (!visible) {
+        m_addHovered = false;
+        m_addPressed = false;
+    }
+    update();
+}
+
 QRect TitleBar::closeButtonRect() const
 {
     const int btnWidth = closeButtonWidth();
     
     return QRect(isRightToLeft() ? 0 : width() - btnWidth, 0, btnWidth, height());
+}
+
+QRect TitleBar::addButtonRect() const
+{
+    // Placed right next to the close button, on its "inner" side, so the
+    // two buttons always sit together regardless of layout direction.
+    const int btnWidth = addButtonWidth();
+    const QRect closeRect = closeButtonRect();
+
+    return QRect(isRightToLeft() ? closeRect.right() + 1 : closeRect.left() - btnWidth,
+                 0, btnWidth, height());
 }
 
 void TitleBar::paintEvent(QPaintEvent *event)
@@ -71,16 +95,22 @@ void TitleBar::paintEvent(QPaintEvent *event)
     }
 
     const QRect closeRect = closeButtonRect();
+    const bool addVisible = m_addButtonVisible && !m_closeButtonOnly;
+    const QRect addRect = addButtonRect();
 
     // Title text (leave room for the close button).
     QRect labelRect = rect();
     if (isRightToLeft()) {
         labelRect.adjust(0, 0, -8, 0);
-        if (m_closeButtonVisible)
+        if (addVisible)
+            labelRect.setLeft(addRect.right() + 2);
+        else if (m_closeButtonVisible)
             labelRect.setLeft(closeRect.right() + 2);
     } else {
         labelRect.adjust(8, 0, 0, 0);
-        if (m_closeButtonVisible)
+        if (addVisible)
+            labelRect.setRight(addRect.left() - 2);
+        else if (m_closeButtonVisible)
             labelRect.setRight(closeRect.left() - 2);
     }
 
@@ -105,6 +135,18 @@ void TitleBar::paintEvent(QPaintEvent *event)
                                                    QSize(sz, sz), closeRect);
         m_closeIcon.paint(&painter, iconRect);
     }
+
+    if (addVisible) {
+        if (m_addHovered) {
+            painter.fillRect(addRect,
+                             m_addPressed ? QColor(255, 255, 255, 60)
+                                          : QColor(255, 255, 255, 35));
+        }
+        const int sz = height() / 3 * 2;
+        const QRect iconRect = QStyle::alignedRect(layoutDirection(), Qt::AlignCenter,
+                                                   QSize(sz, sz), addRect);
+        m_addIcon.paint(&painter, iconRect);
+    }
 }
 
 void TitleBar::mousePressEvent(QMouseEvent *event)
@@ -122,6 +164,14 @@ void TitleBar::mousePressEvent(QMouseEvent *event)
         return;
     }
 
+    if (addButtonActuallyVisible() && addButtonRect().contains(event->pos())) {
+        m_addPressed = true;
+        m_dragPending = false;
+        update();
+        event->accept();
+        return;
+    }
+
     m_dragPending = true;
     event->accept();
 }
@@ -132,6 +182,14 @@ void TitleBar::mouseMoveEvent(QMouseEvent *event)
         const bool hovered = closeButtonRect().contains(event->pos());
         if (hovered != m_closeHovered) {
             m_closeHovered = hovered;
+            update();
+        }
+    }
+
+    if (addButtonActuallyVisible()) {
+        const bool hovered = addButtonRect().contains(event->pos());
+        if (hovered != m_addHovered) {
+            m_addHovered = hovered;
             update();
         }
     }
@@ -159,7 +217,9 @@ void TitleBar::mouseReleaseEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton) {
         const bool wasClosePressed = m_closePressed;
+        const bool wasAddPressed = m_addPressed;
         m_closePressed = false;
+        m_addPressed = false;
         m_dragPending = false;
         update();
         if (wasClosePressed && m_closeButtonVisible
@@ -167,7 +227,13 @@ void TitleBar::mouseReleaseEvent(QMouseEvent *event)
             emit closeRequested();
             event->accept();
             return;
-        }
+            }
+        if (wasAddPressed && addButtonActuallyVisible()
+            && addButtonRect().contains(event->pos())) {
+            emit addRequested();
+            event->accept();
+            return;
+            }
     }
 
     QWidget::mouseReleaseEvent(event);
@@ -175,8 +241,9 @@ void TitleBar::mouseReleaseEvent(QMouseEvent *event)
 
 void TitleBar::mouseDoubleClickEvent(QMouseEvent *event)
 {
-    if (event->button() == Qt::LeftButton
-        && !(m_closeButtonVisible && closeButtonRect().contains(event->pos()))) {
+    const bool onCloseButton = m_closeButtonVisible && closeButtonRect().contains(event->pos());
+    const bool onAddButton = addButtonActuallyVisible() && addButtonRect().contains(event->pos());
+    if (event->button() == Qt::LeftButton && !onCloseButton && !onAddButton) {
         emit maximizeToggleRequested();
         event->accept();
         return;
@@ -196,6 +263,14 @@ void TitleBar::enterEvent(QEnterEvent *event)
         }
     }
 
+    if (addButtonActuallyVisible()) {
+        const bool hovered = addButtonRect().contains(mapFromGlobal(QCursor::pos()));
+        if (hovered != m_addHovered) {
+            m_addHovered = hovered;
+            update();
+        }
+    }
+
     QWidget::enterEvent(event);
 }
 
@@ -203,6 +278,11 @@ void TitleBar::leaveEvent(QEvent *event)
 {
     if (m_closeHovered) {
         m_closeHovered = false;
+        update();
+    }
+
+    if (m_addHovered) {
+        m_addHovered = false;
         update();
     }
 

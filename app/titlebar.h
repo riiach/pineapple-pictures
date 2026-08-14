@@ -28,10 +28,15 @@ public:
     bool closeButtonOnly() const { return m_closeButtonOnly; }
     void setCloseButtonOnly(bool only);
     int closeButtonWidth() const { return qMax(height(), 46); }
+    // "+" button, used to open one or more additional images in new,
+    // independent windows.
+    void setAddButtonVisible(bool visible);
+    int addButtonWidth() const { return qMax(height(), 46); }
 
 signals:
     void closeRequested();
     void maximizeToggleRequested();
+    void addRequested();
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -46,13 +51,19 @@ protected:
 
 private:
     QRect closeButtonRect() const;
+    QRect addButtonRect() const;
+    bool addButtonActuallyVisible() const { return m_addButtonVisible && !m_closeButtonOnly; }
 
     OpacityHelper *m_opacityHelper;
     QIcon m_closeIcon;
+    QIcon m_addIcon;
     bool m_closeButtonVisible = true;
+    bool m_addButtonVisible = true;
     bool m_closeButtonOnly = false;
     bool m_closeHovered = false;
     bool m_closePressed = false;
+    bool m_addHovered = false;
+    bool m_addPressed = false;
     bool m_dragPending = false;
 };
 

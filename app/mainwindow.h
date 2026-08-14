@@ -63,6 +63,7 @@ protected slots:
     void closeWindow();
     void updateWidgetsPosition();
     void toggleProtectedMode();
+    void openImagesInNewWindows();
     void toggleStayOnTop();
     void toggleAvoidResetTransform();
     bool stayOnTop() const;
