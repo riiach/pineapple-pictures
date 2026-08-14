@@ -64,6 +64,7 @@ protected slots:
     void updateWidgetsPosition();
     void toggleProtectedMode();
     void openImagesInNewWindows();
+    void setLocked(bool locked);
     void toggleStayOnTop();
     void toggleAvoidResetTransform();
     bool stayOnTop() const;
@@ -131,6 +132,7 @@ private:
     NavigatorView *m_gv;
     BottomButtonGroup *m_bottomButtonGroup;
     bool m_protectedMode = false;
+    bool m_locked = false;
     bool m_clickedOnWindow = false;
 };
 

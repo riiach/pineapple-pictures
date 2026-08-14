@@ -32,11 +32,17 @@ public:
     // independent windows.
     void setAddButtonVisible(bool visible);
     int addButtonWidth() const { return qMax(height(), 46); }
+    // Lock button: toggles a locked state where only the Lock and Close
+    // buttons remain visible on hover, hiding the rest of the UI.
+    bool locked() const { return m_locked; }
+    void setLocked(bool locked);
+    int lockButtonWidth() const { return qMax(height(), 46); }
 
 signals:
     void closeRequested();
     void maximizeToggleRequested();
     void addRequested();
+    void lockToggled(bool locked);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -52,18 +58,25 @@ protected:
 private:
     QRect closeButtonRect() const;
     QRect addButtonRect() const;
-    bool addButtonActuallyVisible() const { return m_addButtonVisible && !m_closeButtonOnly; }
+    QRect lockButtonRect() const;
+    bool addButtonActuallyVisible() const { return m_addButtonVisible && !m_closeButtonOnly && !m_locked; }
+    bool lockButtonActuallyVisible() const { return m_closeButtonVisible; }
 
     OpacityHelper *m_opacityHelper;
     QIcon m_closeIcon;
     QIcon m_addIcon;
+    QIcon m_lockClosedIcon;
+    QIcon m_lockOpenIcon;
     bool m_closeButtonVisible = true;
     bool m_addButtonVisible = true;
     bool m_closeButtonOnly = false;
+    bool m_locked = false;
     bool m_closeHovered = false;
     bool m_closePressed = false;
     bool m_addHovered = false;
     bool m_addPressed = false;
+    bool m_lockHovered = false;
+    bool m_lockPressed = false;
     bool m_dragPending = false;
 };
 

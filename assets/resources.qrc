@@ -12,5 +12,7 @@
         <file>icons/go-previous.svg</file>
         <file>plain/translators.html</file>
         <file>icons/list-add.svg</file>
+        <file>icons/lock-closed.svg</file>
+        <file>icons/lock-open.svg</file>
     </qresource>
 </RCC>

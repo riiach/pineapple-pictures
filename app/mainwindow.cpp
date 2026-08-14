@@ -115,6 +115,8 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::toggleMaximize);
     connect(m_titleBar, &TitleBar::addRequested,
             this, &MainWindow::openImagesInNewWindows);
+    connect(m_titleBar, &TitleBar::lockToggled,
+            this, &MainWindow::setLocked);
 
     m_prevButton = new ToolButton(m_graphicsView);
     m_prevButton->setIconSize(QSize(75, 75));
@@ -335,12 +337,14 @@ void MainWindow::showEvent(QShowEvent *event)
 
 void MainWindow::enterEvent(QEnterEvent *event)
 {
-    m_bottomButtonGroup->setOpacity(1);
-    m_gv->setOpacity(1);
+    if (!m_locked) {
+        m_bottomButtonGroup->setOpacity(1);
+        m_gv->setOpacity(1);
+        m_prevButton->setOpacity(1);
+        m_nextButton->setOpacity(1);
+    }
 
     m_titleBar->setOpacity(1);
-    m_prevButton->setOpacity(1);
-    m_nextButton->setOpacity(1);
 
     return FramelessWindow::enterEvent(event);
 }
@@ -674,6 +678,21 @@ void MainWindow::openImagesInNewWindows()
         newWindow->initWindowSize();
         newWindow->show();
     }
+}
+
+void MainWindow::setLocked(bool locked)
+{
+    if (m_locked == locked)
+        return;
+
+    m_locked = locked;
+
+    // Hide everything except the title bar's Lock/Close buttons right away,
+    // instead of waiting for the next enterEvent/leaveEvent, so toggling
+    // Lock while the cursor is still over the window takes effect instantly.
+    m_bottomButtonGroup->setOpacity(0);
+    m_gv->setOpacity(0);
+    updateGalleryButtonsVisibility();
 }
 
 void MainWindow::toggleAvoidResetTransform()
@@ -1065,8 +1084,8 @@ void MainWindow::updateGalleryButtonsVisibility()
 {
     const int galleryFileCount = m_pm->totalCount();
     const bool loopGallery = Settings::instance()->loopGallery();
-    m_prevButton->setVisible(!m_protectedMode && galleryFileCount > 1);
-    m_nextButton->setVisible(!m_protectedMode && galleryFileCount > 1);
+    m_prevButton->setVisible(!m_protectedMode && !m_locked && galleryFileCount > 1);
+    m_nextButton->setVisible(!m_protectedMode && !m_locked && galleryFileCount > 1);
     m_prevButton->setEnabled(loopGallery || !m_pm->isFirstIndex());
     m_nextButton->setEnabled(loopGallery || !m_pm->isLastIndex());
 }

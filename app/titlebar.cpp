@@ -19,6 +19,8 @@ TitleBar::TitleBar(QWidget *parent)
     , m_opacityHelper(new OpacityHelper(this))
     , m_closeIcon(QStringLiteral(":/icons/window-close.svg"))
     , m_addIcon(QStringLiteral(":/icons/list-add.svg"))
+    , m_lockClosedIcon(QStringLiteral(":/icons/lock-closed.svg"))
+    , m_lockOpenIcon(QStringLiteral(":/icons/lock-open.svg"))
 {
     setFixedHeight(32);
     setMouseTracking(true);
@@ -65,6 +67,19 @@ void TitleBar::setAddButtonVisible(bool visible)
     update();
 }
 
+void TitleBar::setLocked(bool locked)
+{
+    if (m_locked == locked)
+        return;
+    m_locked = locked;
+    // Leaving the locked/add-button-hidden state might change which
+    // buttons are actually visible, so drop any stale hover state.
+    m_addHovered = false;
+    m_addPressed = false;
+    update();
+    emit lockToggled(m_locked);
+}
+
 QRect TitleBar::closeButtonRect() const
 {
     const int btnWidth = closeButtonWidth();
@@ -83,39 +98,61 @@ QRect TitleBar::addButtonRect() const
                  0, btnWidth, height());
 }
 
+QRect TitleBar::lockButtonRect() const
+{
+    // Chained to whichever button currently sits closest to it (the "+"
+    // button when visible, otherwise the close button directly), so there
+    // is never a gap left behind when the "+" button gets hidden (e.g.
+    // while locked).
+    const int btnWidth = lockButtonWidth();
+    const QRect anchor = addButtonActuallyVisible() ? addButtonRect() : closeButtonRect();
+
+    return QRect(isRightToLeft() ? anchor.right() + 1 : anchor.left() - btnWidth,
+                 0, btnWidth, height());
+}
+
 void TitleBar::paintEvent(QPaintEvent *event)
 {
     Q_UNUSED(event);
     QPainter painter(this);
 
     // Subtle translucent backdrop so the title bar region is distinguishable
-    // (similar to the bottom button group). Skipped in close-button-only mode.
-    if (!m_closeButtonOnly) {
+    // (similar to the bottom button group). Skipped in close-button-only
+    // mode, and skipped while locked so only the Lock/Close buttons stand
+    // out against the picture on hover.
+    if (!m_closeButtonOnly && !m_locked) {
         painter.fillRect(rect(), QColor(0, 0, 0, 120));
     }
 
     const QRect closeRect = closeButtonRect();
-    const bool addVisible = m_addButtonVisible && !m_closeButtonOnly;
+    const bool addVisible = addButtonActuallyVisible();
     const QRect addRect = addButtonRect();
+    const bool lockVisible = lockButtonActuallyVisible();
+    const QRect lockRect = lockButtonRect();
 
-    // Title text (leave room for the close button).
+    // Title text (leave room for the close button and, when visible, the
+    // "+"/Lock buttons next to it). Hidden entirely while locked.
     QRect labelRect = rect();
     if (isRightToLeft()) {
         labelRect.adjust(0, 0, -8, 0);
-        if (addVisible)
+        if (lockVisible)
+            labelRect.setLeft(lockRect.right() + 2);
+        else if (addVisible)
             labelRect.setLeft(addRect.right() + 2);
         else if (m_closeButtonVisible)
             labelRect.setLeft(closeRect.right() + 2);
     } else {
         labelRect.adjust(8, 0, 0, 0);
-        if (addVisible)
+        if (lockVisible)
+            labelRect.setRight(lockRect.left() - 2);
+        else if (addVisible)
             labelRect.setRight(addRect.left() - 2);
         else if (m_closeButtonVisible)
             labelRect.setRight(closeRect.left() - 2);
     }
 
     const QString title = window() ? window()->windowTitle() : QString();
-    if (!m_closeButtonOnly && !title.isEmpty()) {
+    if (!m_closeButtonOnly && !m_locked && !title.isEmpty()) {
         const QString elided = painter.fontMetrics().elidedText(title, Qt::ElideRight, labelRect.width());
         const int flags = Qt::AlignLeading | Qt::AlignVCenter | Qt::TextSingleLine;
         painter.setPen(Qt::black);
@@ -147,6 +184,18 @@ void TitleBar::paintEvent(QPaintEvent *event)
                                                    QSize(sz, sz), addRect);
         m_addIcon.paint(&painter, iconRect);
     }
+
+    if (lockVisible) {
+        if (m_lockHovered) {
+            painter.fillRect(lockRect,
+                             m_lockPressed ? QColor(255, 255, 255, 60)
+                                           : QColor(255, 255, 255, 35));
+        }
+        const int sz = height() / 3 * 2;
+        const QRect iconRect = QStyle::alignedRect(layoutDirection(), Qt::AlignCenter,
+                                                   QSize(sz, sz), lockRect);
+        (m_locked ? m_lockClosedIcon : m_lockOpenIcon).paint(&painter, iconRect);
+    }
 }
 
 void TitleBar::mousePressEvent(QMouseEvent *event)
@@ -166,6 +215,14 @@ void TitleBar::mousePressEvent(QMouseEvent *event)
 
     if (addButtonActuallyVisible() && addButtonRect().contains(event->pos())) {
         m_addPressed = true;
+        m_dragPending = false;
+        update();
+        event->accept();
+        return;
+    }
+
+    if (lockButtonActuallyVisible() && lockButtonRect().contains(event->pos())) {
+        m_lockPressed = true;
         m_dragPending = false;
         update();
         event->accept();
@@ -194,6 +251,14 @@ void TitleBar::mouseMoveEvent(QMouseEvent *event)
         }
     }
 
+    if (lockButtonActuallyVisible()) {
+        const bool hovered = lockButtonRect().contains(event->pos());
+        if (hovered != m_lockHovered) {
+            m_lockHovered = hovered;
+            update();
+        }
+    }
+
 #if defined(Q_OS_WIN)
     const bool shouldAcceptDrag = !window()->isMaximized() && !window()->isFullScreen();
 #else
@@ -218,8 +283,10 @@ void TitleBar::mouseReleaseEvent(QMouseEvent *event)
     if (event->button() == Qt::LeftButton) {
         const bool wasClosePressed = m_closePressed;
         const bool wasAddPressed = m_addPressed;
+        const bool wasLockPressed = m_lockPressed;
         m_closePressed = false;
         m_addPressed = false;
+        m_lockPressed = false;
         m_dragPending = false;
         update();
         if (wasClosePressed && m_closeButtonVisible
@@ -234,6 +301,12 @@ void TitleBar::mouseReleaseEvent(QMouseEvent *event)
             event->accept();
             return;
             }
+        if (wasLockPressed && lockButtonActuallyVisible()
+            && lockButtonRect().contains(event->pos())) {
+            setLocked(!m_locked);
+            event->accept();
+            return;
+            }
     }
 
     QWidget::mouseReleaseEvent(event);
@@ -243,7 +316,8 @@ void TitleBar::mouseDoubleClickEvent(QMouseEvent *event)
 {
     const bool onCloseButton = m_closeButtonVisible && closeButtonRect().contains(event->pos());
     const bool onAddButton = addButtonActuallyVisible() && addButtonRect().contains(event->pos());
-    if (event->button() == Qt::LeftButton && !onCloseButton && !onAddButton) {
+    const bool onLockButton = lockButtonActuallyVisible() && lockButtonRect().contains(event->pos());
+    if (event->button() == Qt::LeftButton && !onCloseButton && !onAddButton && !onLockButton) {
         emit maximizeToggleRequested();
         event->accept();
         return;
@@ -271,6 +345,14 @@ void TitleBar::enterEvent(QEnterEvent *event)
         }
     }
 
+    if (lockButtonActuallyVisible()) {
+        const bool hovered = lockButtonRect().contains(mapFromGlobal(QCursor::pos()));
+        if (hovered != m_lockHovered) {
+            m_lockHovered = hovered;
+            update();
+        }
+    }
+
     QWidget::enterEvent(event);
 }
 
@@ -280,9 +362,12 @@ void TitleBar::leaveEvent(QEvent *event)
         m_closeHovered = false;
         update();
     }
-
     if (m_addHovered) {
         m_addHovered = false;
+        update();
+    }
+    if (m_lockHovered) {
+        m_lockHovered = false;
         update();
     }
 
