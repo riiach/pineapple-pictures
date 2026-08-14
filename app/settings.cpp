@@ -47,7 +47,9 @@ Settings *Settings::instance()
 
 bool Settings::stayOnTop() const
 {
-    return m_qsettings->value("stay_on_top", true).toBool();
+    // Changed default from `true` to `false` so the window behaves like a
+    // normal window and follows the regular focus/z-order stacking.
+    return m_qsettings->value("stay_on_top", false).toBool();
 }
 
 bool Settings::useBuiltInCloseAnimation() const
