@@ -1,6 +1,8 @@
 ## How to clone this project and build on your computer
 I wrote a short tutorial on how to clone this project. 
-[Please check out this link!!] (https://riachoi-services.vercel.app/blog/make-a-gallery-wall-with-pineapple-pictures)
+
+
+[Please check out this link!!](https://riachoi-services.vercel.app/blog/make-a-gallery-wall-with-pineapple-pictures)
 
 Yet another image viewer.
 
